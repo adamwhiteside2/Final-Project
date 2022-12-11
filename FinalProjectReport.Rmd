@@ -1,0 +1,45 @@
+---
+title: "Final Project"
+output: html_notebook
+name: "Adam Whiteside"
+---
+Research Question:
+What is the relationship between a player on the Dallas Mavericks' salary and production on the court in the 2021-2022 season?
+
+Data Intake:
+```{r}
+library(tidyverse)
+library(rvest)
+
+BasketballReference<- "https://en.wikipedia.org/wiki/2021%E2%80%9322_Dallas_Mavericks_season"
+StatsTable <- BasketballReference %>%
+  read_html() %>%
+  html_nodes(css = "table") %>%
+  html_table(fill = TRUE)
+  PlayerGameStats <- StatsTable[[22]]
+  PlayerGameStats
+```
+```{r}
+SalaryWebsite <- "https://hoopshype.com/salaries/dallas_mavericks/2021-2022/"
+SalaryData<- Salaries %>%
+  read_html() %>%
+  html_nodes(css = "table") %>%
+  html_table(fill = TRUE)
+  SalaryTable <- SalaryData[[1]]
+  SalaryTable
+```
+Examine each data source:
+
+The Player game stats table is data collected about each players' statistics recorded and summarized for every game of the NBA regular season in 2021-2022, playing on the Dallas Mavericks. They record statistics as a resource to fans and owners of teams as a resource to investigate player productivity. Scorekeepers will record statistics during every game of every season of the NBA just like any other major sport.
+
+The Salary table is data on the players that were paid by the Dallas Mavericks to play basketball in the 2021-2022 season. This data is collected to show fans and owners how much of the team's salary was spent on each individual player.
+
+
+Discover/Explore features that may influence modeling decisions:
+
+There might be outliers in the player game statistics due to the fact that some players may not have had the opportunity to play, therfore not record some statistics. I do not think there will be any outliers in the salary data, because the salaries are fairly close together. I plan on joining the two tables together, so that I can do some calculations for each player in terms of how much they are getting paid. The games played column is related to the minutes per game column, as if a player is playing in more games, their minutes per game will generally be higher.The two salary variables are directly related, as the second column is the salaries adjested for inflation.
+
+Address Research Question:
+
+I think that I will deduce that, for most of the team, the more a player got paid, the better they played/more production they offered to the team. I think that there are some players that played better than how they got paid, like Luka Doncic. There will additionally be players that got paid more than the value they provided to the team, relatively.
+
