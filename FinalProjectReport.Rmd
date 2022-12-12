@@ -17,8 +17,23 @@ StatsTable <- BasketballReference %>%
   html_nodes(css = "table") %>%
   html_table(fill = TRUE)
   PlayerGameStats <- StatsTable[[22]]
-  PlayerGameStats
+  head(PlayerGameStats)
 ```
+
+```{r}
+library(tidyverse)
+library(rvest)
+
+BasketballReference<- "https://www.basketball-reference.com/teams/DAL/2022.html"
+AdvancedStatsTable <- BasketballReference %>%
+  read_html() %>%
+  html_nodes(css = "table") %>%
+  html_table(fill = TRUE)
+  AdvancedPlayerGameStats <- AdvancedStatsTable[[6]]
+  (AdvancedPlayerGameStats)
+```
+
+
 ```{r}
 SalaryWebsite <- "https://hoopshype.com/salaries/dallas_mavericks/2021-2022/"
 SalaryData<- Salaries %>%
@@ -26,20 +41,147 @@ SalaryData<- Salaries %>%
   html_nodes(css = "table") %>%
   html_table(fill = TRUE)
   SalaryTable <- SalaryData[[1]]
-  SalaryTable
+  head(SalaryTable)
+  
 ```
-Examine each data source:
-
-The Player game stats table is data collected about each players' statistics recorded and summarized for every game of the NBA regular season in 2021-2022, playing on the Dallas Mavericks. They record statistics as a resource to fans and owners of teams as a resource to investigate player productivity. Scorekeepers will record statistics during every game of every season of the NBA just like any other major sport.
-
-The Salary table is data on the players that were paid by the Dallas Mavericks to play basketball in the 2021-2022 season. This data is collected to show fans and owners how much of the team's salary was spent on each individual player.
 
 
-Discover/Explore features that may influence modeling decisions:
 
-There might be outliers in the player game statistics due to the fact that some players may not have had the opportunity to play, therfore not record some statistics. I do not think there will be any outliers in the salary data, because the salaries are fairly close together. I plan on joining the two tables together, so that I can do some calculations for each player in terms of how much they are getting paid. The games played column is related to the minutes per game column, as if a player is playing in more games, their minutes per game will generally be higher.The two salary variables are directly related, as the second column is the salaries adjested for inflation.
 
-Address Research Question:
+```{r}
 
-I think that I will deduce that, for most of the team, the more a player got paid, the better they played/more production they offered to the team. I think that there are some players that played better than how they got paid, like Luka Doncic. There will additionally be players that got paid more than the value they provided to the team, relatively.
+colnames(AdvancedPlayerGameStats)[2] <- "PlayerName"
+colnames(AdvancedPlayerGameStats)[18] <- "a"
+colnames(AdvancedPlayerGameStats)[23] <- "b"
 
+colnames(SalaryTable)[1] <- "PlayerName"
+colnames(SalaryTable)[3] <- "Player Salaries(adjusted for inflation)"
+
+colnames(PlayerGameStats)[1] <- "PlayerName"
+```
+
+```{r}
+SalaryTableFixed<-
+  SalaryTable%>%
+  filter(PlayerName != "Player")
+```
+
+
+```{r}
+
+AdvancedPlayerGameStats$PlayerName <-
+  str_replace_all(AdvancedPlayerGameStats$PlayerName, c("č" = "c", "ć" = "c", "ņ" = "n", "ģ" = "g", "ā" = "a"))
+
+
+AdvancedPlayerGameStats$PlayerName<-
+  str_replace(AdvancedPlayerGameStats$PlayerName, " Jr", "")
+
+AdvancedPlayerGameStats$PlayerName<-
+  str_remove(AdvancedPlayerGameStats$PlayerName, "\\.$")
+  
+SalaryTableFixed$PlayerName<-
+  str_replace(SalaryTableFixed$PlayerName, " Jr", "")
+
+
+
+```
+
+
+
+```{r}
+SalaryandAdvanced<-
+  right_join(SalaryTableFixed,AdvancedPlayerGameStats, by="PlayerName")
+  colnames(SalaryandAdvanced)[2] <- "PlayerSalaries"
+
+SalaryandAdvanced
+```
+
+
+
+```{r}
+SalaryandAdvanced$PlayerSalaries<-
+  parse_number(SalaryandAdvanced$PlayerSalaries)
+
+SalaryandAdvanced$`Player Salaries(adjusted for inflation)`<-
+  parse_number(SalaryandAdvanced$`Player Salaries(adjusted for inflation)`)
+
+```
+
+```{r}
+SalaryandAdvanced[27,"PlayerSalaries"] <- 38800000; SalaryandAdvanced
+SalaryandAdvanced[27,"Player Salaries(adjusted for inflation)"] <- 42672124; SalaryandAdvanced
+```
+
+```{r}
+SalaryandAdvanced<-
+  SalaryandAdvanced%>%
+  mutate(newPER=(PER+15))%>%
+  mutate(PertimesMP=(newPER*MP))%>%
+  mutate( Salary_PER_Ratio = (PlayerSalaries/PertimesMP))%>%
+  arrange(Salary_PER_Ratio)
+
+```
+
+```{r}
+SalaryandAdvanced[which.max(SalaryandAdvanced$Salary_PER_Ratio),]%>%
+  select(PlayerName, Salary_PER_Ratio)%>%
+  summarise(PlayerNameofHighestRatio=PlayerName, Ratio=Salary_PER_Ratio)
+```
+
+```{r}
+SalaryandAdvanced[which.min(SalaryandAdvanced$Salary_PER_Ratio),]%>%
+  select(PlayerName, Salary_PER_Ratio)%>%
+  summarise(PlayerNameofLowestRatio=PlayerName, Ratio=Salary_PER_Ratio)
+```
+```{r}
+
+
+PlayerRatioPlot<-
+  SalaryandAdvanced%>%
+  head(5)%>%
+  ggplot(aes(x=reorder(PlayerName, Salary_PER_Ratio), y=Salary_PER_Ratio))+
+  geom_bar(stat="identity", color="blue", fill="lightblue")+
+  ggtitle("Top 5 Best Salary to Production Ratios from Dallas Mavericks 2021-2022 Season")+
+  xlab("Player Name")+
+  ylab("Salary to Production Ratio")
+PlayerRatioPlot
+
+
+```
+```{r}
+PlotbyMinutes<- function(minimum_minutes, minimum_age){
+  PlayerRatioPlot<-
+  SalaryandAdvanced%>%
+  filter(MP>minimum_minutes)%>%
+  filter(Age>minimum_age)%>%
+  head(5)%>%
+  ggplot(aes(x=reorder(PlayerName, Salary_PER_Ratio), y=Salary_PER_Ratio))+
+  geom_bar(stat="identity", color="blue", fill="lightblue")+
+  ggtitle(paste("Top 5 Best Salary to Production Ratios with more than", minimum_minutes,
+                "minutes \n and older than" ,minimum_age, "from Dallas Mavericks in 2021-2022 Season"))+
+  xlab("Player Name")+
+  ylab("Salary to Production Ratio")
+  return(PlayerRatioPlot)
+}
+  PlotbyMinutes(1000, 28)
+```
+```{r}
+MeanAgeStats<-
+  SalaryandAdvanced%>%
+  group_by(Age)%>%
+  summarise(MeanPerAge= mean(Salary_PER_Ratio))
+
+MeanAgeStats
+```
+
+```{r}
+
+PlayerRatioPlot<-
+  MeanAgeStats%>%
+  ggplot(aes(x=Age, y=MeanPerAge))+
+  geom_smooth(stat="identity", linewidth=2, linetype="solid")+
+  ggtitle("Salary to Production Ratio based on Age from Dallas Mavericks players \n in the 2021-2022 Season")+
+  xlab("Age")+
+  ylab("Salary to Production Ratio")
+PlayerRatioPlot
+```
